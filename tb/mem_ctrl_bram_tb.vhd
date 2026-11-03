@@ -11,7 +11,8 @@ use work.mem_if_pkg.all;
 entity mem_ctrl_bram_tb is
   generic (
     DEPTH_W : positive range 1 to MEM_DATA_W := 8;
-    N_RAND  : natural := 3000
+    N_RAND  : natural := 3000;
+    TB_NAME : string  := "mem_ctrl_bram_tb"   -- name in the pass line (scripts/sim.tcl)
   );
 end entity;
 
@@ -234,8 +235,9 @@ begin
     wait for 1 ns;
     if errors = 0 and n_checked + n_flushed = n_reads and q_left = 0
        and n_flushed = 1 and n_checked > 100 then
-      report "PASS: " & integer'image(n_checked) & " reads checked, DEPTH_W=" &
+      report TB_NAME & ": " & integer'image(n_checked) & " reads checked, DEPTH_W=" &
              integer'image(DEPTH_W);
+      report TB_NAME & ": ALL TESTS PASSED";
     else
       report "FAIL: errors=" & integer'image(errors) & " checked=" &
              integer'image(n_checked) & " flushed=" & integer'image(n_flushed) &
