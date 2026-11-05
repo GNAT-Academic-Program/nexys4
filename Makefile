@@ -39,3 +39,6 @@ build:
 
 clean:
 	rm -rf build .Xil
+.PHONY: sim-frame-dump
+sim-frame-dump:
+	$(VBATCH) -source scripts/sim.tcl -tclargs frame_dump_tb $(FB_SRCS) tb/frame_dump_pkg.vhd tb/frame_dump_tb.vhd
