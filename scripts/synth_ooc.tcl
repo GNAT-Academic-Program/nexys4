@@ -17,7 +17,12 @@ file mkdir $out_dir
 foreach f [lrange $argv 4 end] {
     read_vhdl -vhdl2008 [file normalize [file join $repo $f]]
 }
-synth_design -top $top -part $part -mode out_of_context
+set synth_args [list -top $top -part $part -mode out_of_context]
+if {$top eq "asset_memory"} {
+    set init_file [file join $repo rtl data cube_init.txt]
+    lappend synth_args -generic "INIT_FILE=$init_file"
+}
+synth_design {*}$synth_args
 create_clock -name clk -period $period [get_ports $clk_port]
 
 report_utilization      -file [file join $out_dir utilization.rpt]

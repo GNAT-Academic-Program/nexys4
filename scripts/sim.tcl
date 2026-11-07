@@ -21,6 +21,11 @@ foreach f [lrange $argv 1 end] {
 set run_dir [file join $repo build sim $top]
 file delete -force $run_dir
 file mkdir $run_dir
+# Stage the asset file where the VHDL loader expects it.
+file mkdir [file join $run_dir data]
+file copy -force \
+    [file join $repo rtl data cube_init.txt] \
+    [file join $run_dir data cube_init.txt]
 cd $run_dir
 
 set ext [expr {$::tcl_platform(platform) eq "windows" ? ".bat" : ""}]
