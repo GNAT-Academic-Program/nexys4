@@ -1,0 +1,14 @@
+--  Host-side tool: converts a framebuffer dump (frame_dump_tb) to a PPM image.
+--  Build from the repo root:  gprbuild -P sw/ada/tools/fb2ppm.gpr
+--  Result:                    build/ada/fb2ppm (fb2ppm.exe on Windows)
+project Fb2ppm is
+   for Source_Dirs use (".");
+   for Main use ("fb2ppm.adb");
+   for Object_Dir use "../../../build/ada/obj";
+   for Exec_Dir use "../../../build/ada";
+   for Create_Missing_Dirs use "True";
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-gnat2022", "-gnatwa", "-gnata");
+   end Compiler;
+end Fb2ppm;

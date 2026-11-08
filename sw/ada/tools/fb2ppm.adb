@@ -1,4 +1,5 @@
 with Ada.Command_Line;
+with Ada.Exceptions;
 with Ada.Streams;
 with Ada.Streams.Stream_IO;
 with Ada.Text_IO;
@@ -71,12 +72,17 @@ begin
          raise Constraint_Error with "expected 76800 pixels; input ended early";
       end if;
       declare
-         Line : constant String := Ada.Text_IO.Get_Line (Input);
+         Raw : constant String := Ada.Text_IO.Get_Line (Input);
+         --  A CRLF file read on Linux keeps the CR; drop it
+         Line : constant String :=
+           (if Raw'Length > 0 and then Raw (Raw'Last) = ASCII.CR
+            then Raw (Raw'First .. Raw'Last - 1) else Raw);
          Pixel_Value : Natural;
          Colour : RGB;
       begin
          if Line'Length /= 2 then
-            raise Constraint_Error with "expected exactly two hex digits per line";
+            raise Constraint_Error with
+              "line" & Pixel'Image & ": expected exactly two hex digits";
          end if;
 
          Pixel_Value := 16 * Hex_Digit (Line (Line'First))
@@ -99,7 +105,7 @@ begin
    Binary_IO.Close (Output);
    Ada.Text_IO.Put_Line ("Wrote 320x240 P6 image: " & Argument (2));
 exception
-   when others =>
+   when E : others =>
       if Ada.Text_IO.Is_Open (Input) then
          Ada.Text_IO.Close (Input);
       end if;
@@ -107,6 +113,7 @@ exception
          Binary_IO.Close (Output);
       end if;
       Ada.Text_IO.Put_Line
-        (Ada.Text_IO.Standard_Error, "fb2ppm failed.");
+        (Ada.Text_IO.Standard_Error,
+         "fb2ppm failed: " & Ada.Exceptions.Exception_Message (E));
       Set_Exit_Status (Failure);
 end FB2PPM;
