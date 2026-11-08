@@ -1,16 +1,18 @@
 --Helen Xu
---Last Updated: 11/3/2026
---Verilator test reads a framebuffer preloaded with a gradient and checks that 4 neighboring screen 
+--Last Updated: 11/8/2026
+--Reads a framebuffer preloaded with a gradient and checks that 4 neighboring screen
 --pixels show the same color and that blanking is black; syncs are aligned with the delayed data.
+--PIX_DIV = 4 runs a 100 MHz clock with a one-in-four pixel enable, as on the board.
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-entity tb_vga_scanout is
+entity vga_scanout_tb is
+  generic (PIX_DIV : positive := 1);
 end entity;
 
-architecture sim of tb_vga_scanout is
+architecture sim of vga_scanout_tb is
 
   constant FB_W      : natural := 320;
   constant FB_H      : natural := 240;
@@ -56,6 +58,7 @@ architecture sim of tb_vga_scanout is
   signal vga_hs_n : std_logic;
   signal vga_vs_n : std_logic;
   signal done     : boolean := false;
+  signal pix_en   : std_logic := '1';
 
 begin
  -- device under test instantiation
@@ -63,6 +66,7 @@ begin
     port map (
       clk_i      => clk,
       rst_n_i    => rst_n,
+      pix_en_i   => pix_en,
       fb_raddr_o => fb_raddr,
       fb_rdata_i => fb_rdata,
       vga_r_o    => vga_r,
@@ -72,7 +76,18 @@ begin
       vga_vs_n_o => vga_vs_n
     );
 
-  clk <= not clk after 20 ns when not done;
+  clk <= not clk after (20 ns / PIX_DIV) when not done;
+
+  pix_div_gen : if PIX_DIV > 1 generate
+    process (clk)
+      variable n : natural range 0 to PIX_DIV - 1 := 0;
+    begin
+      if rising_edge(clk) then
+        if n = PIX_DIV - 1 then n := 0; else n := n + 1; end if;
+        if n = PIX_DIV - 1 then pix_en <= '1'; else pix_en <= '0'; end if;
+      end if;
+    end process;
+  end generate;
   rst_n <= '1' after 200 ns;
 
   -- framebuffer model with 1-cycle read latency
@@ -96,6 +111,14 @@ begin
     variable vs_low   : boolean;
     variable errors   : natural := 0;
 
+    -- one screen pixel lasts PIX_DIV clocks
+    procedure next_pixel is
+    begin
+      for k in 1 to PIX_DIV loop
+        wait until falling_edge(clk);
+      end loop;
+    end procedure;
+
     procedure fail(msg : string) is -- report an error, but don't stop the simulation
     begin
       if errors < 10 then
@@ -112,7 +135,7 @@ begin
     wait until rising_edge(vga_hs_n);
     wait until falling_edge(clk);
     for i in 1 to H_BACK + (V_BACK - 1) * H_TOTAL loop
-      wait until falling_edge(clk);
+      next_pixel;
     end loop;
 
     for p in 0 to H_TOTAL * V_TOTAL - 1 loop
@@ -148,11 +171,11 @@ begin
         fail("vsync misaligned");
       end if;
 
-      wait until falling_edge(clk);
+      next_pixel;
     end loop;
 
     if errors = 0 then
-      report "PASS";
+      report "vga_scanout_tb: ALL TESTS PASSED";
     else
       report "FAIL: " & integer'image(errors) & " errors" severity error;
     end if;
