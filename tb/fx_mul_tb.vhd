@@ -1,8 +1,11 @@
 -- fx_mul_tb.vhd : VHDL-2008 self-checking testbench for fx_mul (xsim).
 -- Reads vectors written by the Ada model (model/fx_ref.adb):
 --   "AAAAAAAA BBBBBBBB YYYYYYYY" hex per line (20 directed + 1000 random).
+-- ROUND selects the file: 1 -> vectors_round.txt, 0 -> vectors_trunc.txt
+-- (scripts/sim.tcl copies tb/vectors/ into the run directory).
 -- Drives back-to-back with periodic bubbles (valid low) to exercise the
--- valid pipe, and checks y in order at the documented latency of 3 cycles.
+-- valid pipe. Checks y in order, and checks every cycle that out_valid
+-- equals in_valid delayed by exactly LATENCY clock edges.
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -11,14 +14,23 @@ use std.env.all;
 
 entity fx_mul_tb is
   generic (
-    ROUND     : natural := 0;
-    VEC_FILE  : string  := "vectors_trunc.txt";
+    ROUND     : natural range 0 to 1 := 1;
     N_EXPECT  : natural := 1020
   );
 end entity;
 
 architecture sim of fx_mul_tb is
   constant LATENCY : natural := 3;
+
+  function pick_vec_file return string is
+  begin
+    if ROUND = 1 then
+      return "vectors_round.txt";
+    else
+      return "vectors_trunc.txt";
+    end if;
+  end function;
+  constant VEC_FILE : string := pick_vec_file;
   type vec_t is array (0 to N_EXPECT - 1) of std_logic_vector(31 downto 0);
   signal va, vb, vy : vec_t;
 
@@ -28,6 +40,7 @@ architecture sim of fx_mul_tb is
   signal out_valid : std_logic;
   signal done      : boolean := false;
   signal errors    : natural := 0;
+  signal lat_errs  : natural := 0;
   signal checked   : natural := 0;
 begin
   clk <= not clk after 5 ns when not done;
@@ -93,14 +106,30 @@ begin
     end if;
   end process;
 
+  -- latency checker: model the valid pipe and compare every cycle
+  lat : process (clk)
+    variable pipe : std_logic_vector(LATENCY - 1 downto 0) := (others => '0');
+  begin
+    if rising_edge(clk) then
+      pipe := pipe(LATENCY - 2 downto 0) & in_valid;
+    end if;
+    if falling_edge(clk) and out_valid /= pipe(LATENCY - 1) then
+      report "LATENCY: out_valid=" & std_logic'image(out_valid) &
+             ", expected " & std_logic'image(pipe(LATENCY - 1)) severity error;
+      lat_errs <= lat_errs + 1;
+    end if;
+  end process;
+
   final : process
   begin
     wait until done;
     wait for 1 ns;
-    if errors = 0 and checked = N_EXPECT then
-      report "PASS: " & integer'image(checked) & " vectors, ROUND=" & integer'image(ROUND);
+    if errors = 0 and lat_errs = 0 and checked = N_EXPECT then
+      report "fx_mul_tb: " & integer'image(checked) & " vectors, ROUND=" & integer'image(ROUND);
+      report "fx_mul_tb: ALL TESTS PASSED";
     else
-      report "FAIL: errors=" & integer'image(errors) & " checked=" &
+      report "FAIL: errors=" & integer'image(errors) & " latency errors=" &
+             integer'image(lat_errs) & " checked=" &
              integer'image(checked) & "/" & integer'image(N_EXPECT) severity failure;
     end if;
     finish;
