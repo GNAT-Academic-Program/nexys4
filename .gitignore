@@ -18,3 +18,6 @@ xsim.log
 xsim*.jou
 *.pb
 xsim*.backup.log
+# Golden vectors too large to commit; regenerate with "make vectors"
+tb/vectors/edge.csv
+tb/vectors/interp.csv
