@@ -2,6 +2,9 @@
 --  Usage: fx_ref <0|1>     0 = truncate, 1 = round half up (matches ROUND)
 --  Writes vectors_trunc.txt / vectors_round.txt: "AAAAAAAA BBBBBBBB YYYYYYYY"
 --  (hex, one case per line): 20 directed cases then 1000 random cases.
+--  Shift is floor (contract rule 4); no case overflows (contract rule 7).
+--  Regenerate from tb/vectors/:  gnatmake ../../model/fx_ref.adb
+--                                ./fx_ref 0 && ./fx_ref 1
 with Ada.Text_IO;          use Ada.Text_IO;
 with Ada.Command_Line;
 with Ada.Numerics.Discrete_Random;
@@ -72,32 +75,45 @@ begin
    end if;
    Create (F, Out_File, (if Round_Mode = 1 then "vectors_round.txt"
                                            else "vectors_trunc.txt"));
-   --  20 directed cases
-   Emit (Q (1.0), Q (1.0));            --  1.0*1.0 = 0x00010000
+   --  20 directed cases: the same inputs, in the same order, as the
+   --  directed rows of mul.csv in docs/spec/golden-vectors-set.md
+   Emit (Q (1.0), Q (1.0));            --  1 x 1
+   Emit (0, Q (1.0));                  --  zero on each side
+   Emit (Q (1.0), 0);
    Emit (Q (0.5), Q (-2.0));           --  = -1.0
    Emit (Q (-0.5), Q (0.5));           --  = -0.25
-   Emit (0, 0);
-   Emit (0, Q (123.456));
-   Emit (Q (-7.25), 0);
-   Emit (Q (1.0), Max);
-   Emit (Q (1.0), Min);
-   Emit (Q (-1.0), Min);               --  wraps
-   Emit (Min, Min);                    --  2**62 product
-   Emit (Max, Max);
-   Emit (Max, Min);
-   Emit (Q (2.5), Q (4.0));
-   Emit (Q (-2.5), Q (-4.0));
-   Emit (Q (100.0), Q (-100.0));
-   Emit (1, 1);                        --  smallest LSBs -> 0
-   Emit (1, 16#8000#);                 --  rounding boundary (+): trunc 0, round 1
-   Emit (-1, 16#8000#);                --  rounding boundary (-): trunc -1, round 0
-   Emit (-1, 16#7FFF#);                --  just below half
-   Emit (16#0001_8000#, Q (3.0));      --  1.5*3.0 = 4.5
+   Emit (Q (-1.0), Q (-1.0));          --  = 1.0
+   Emit (1, Q (1.0));                  --  +/-1 LSB x 1
+   Emit (-1, Q (1.0));
+   Emit (1, 16#8000#);                 --  +0.5 LSB tie: trunc 0, round 1
+   Emit (-1, 16#8000#);                --  -0.5 LSB tie: trunc -1, round 0
+   Emit (1, 16#7FFF#);                 --  just below the tie
+   Emit (3, 16#8000#);                 --  +1.5 LSB tie
+   Emit (-3, 16#8000#);                --  -1.5 LSB tie
+   Emit (1, 1);                        --  LSB x LSB -> 0
+   Emit (Max, Q (1.0));                --  max and min x 1
+   Emit (Min, Q (1.0));
+   Emit (Max, Q (0.5));                --  max x 0.5
+   Emit (Q (181.0), Q (181.0));        --  near the limit
+   Emit (Q (-181.0), Q (181.0));
+   Emit (16#0003_243F#, -16#0002_B7E1#);  --  pi x -e
 
-   --  1000 random cases, fixed seed (reproducible)
+   --  1000 random cases, fixed seed (reproducible). Numeric contract
+   --  rule 7 forbids overflow, so every product fits in Q16.16:
+   --  odd cases use |a|, |b| < 2**23 (+/-128.0), even cases use a full
+   --  32-bit a and |b| < 2**15 (+/-0.5). Either way |a * b| < 2**46.
    Rnd.Reset (G, 12345);
    for I in 1 .. 1000 loop
-      Emit (I64 (Rnd.Random (G)), I64 (Rnd.Random (G)));
+      declare
+         A : constant I64 := I64 (Rnd.Random (G));
+         B : constant I64 := I64 (Rnd.Random (G));
+      begin
+         if I mod 2 = 1 then
+            Emit (A mod 2 ** 24 - 2 ** 23, B mod 2 ** 24 - 2 ** 23);
+         else
+            Emit (A, B mod 2 ** 16 - 2 ** 15);
+         end if;
+      end;
    end loop;
    Close (F);
 end Fx_Ref;
