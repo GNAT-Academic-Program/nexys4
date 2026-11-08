@@ -3,7 +3,9 @@
 --
 -- y = (a * b) >>> FRAC, low 32 bits of the shifted 64-bit product.
 --   a, b : signed Q16.16 (FRAC = 16), two's complement
---   y    : signed Q16.16; wraps (no saturation) if the result exceeds 32 bits
+--   y    : signed Q16.16; wraps (no saturation) if the result exceeds 32 bits.
+--          Numeric contract rule 7 forbids such inputs: callers must keep the
+--          product in range (proved in Ada, asserted in simulation).
 --
 -- LATENCY: 3 clock cycles, throughput 1 result/cycle (fully pipelined).
 --   in_valid at edge N  ->  y / out_valid valid after edge N+2
@@ -15,11 +17,12 @@
 --   y is not gated by valid: it holds don't-care data while out_valid = '0'.
 --   out_valid is initialised '0' (FPGA power-up value); no reset port per S2.
 --
--- ROUND generic: 0 = truncate (floor, default until numeric contract lands)
---                1 = round half up (adds 2**(FRAC-1) before the shift)
+-- ROUND generic: 1 = round half up, ties toward +inf: (a*b + 2**(FRAC-1)) >> FRAC
+--                    (numeric contract rule 5, the default)
+--                0 = truncate (floor); kept for comparison only
 --
 -- Vivado maps 32x32 signed onto 4 DSP48E1 (25x18) slices. Check the
--- utilization report for DSP48E1 > 0 (see tb/README notes).
+-- utilization report for DSP48E1 > 0 (make synth-fx-mul).
 -------------------------------------------------------------------------------
 library ieee;
 use ieee.std_logic_1164.all;
@@ -28,7 +31,7 @@ use ieee.numeric_std.all;
 entity fx_mul is
   generic (
     FRAC  : natural range 1 to 32 := 16;
-    ROUND : natural range 0 to 1  := 0
+    ROUND : natural range 0 to 1  := 1
   );
   port (
     clk       : in  std_logic;
