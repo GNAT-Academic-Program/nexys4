@@ -3,23 +3,24 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.qogpu_pkg.all;
 
 entity clear_engine_tb is
 end entity;
 
 architecture sim of clear_engine_tb is
   constant T     : time    := 10 ns;
-  constant NPIX  : natural := 76800;
+  constant NPIX  : natural := FB_PIXELS;
 
   signal clk, rst_n : std_logic := '0';
   signal start      : std_logic := '0';
-  signal color_in   : std_logic_vector(7 downto 0) := (others => '0');
+  signal color_in   : pixel_t := (others => '0');
   signal busy, done : std_logic;
   signal we         : std_logic;
-  signal waddr      : unsigned(16 downto 0);
-  signal wdata      : std_logic_vector(7 downto 0);
-  signal raddr      : unsigned(16 downto 0) := (others => '0');
-  signal rdata      : std_logic_vector(7 downto 0);
+  signal waddr      : fb_addr_t;
+  signal wdata      : pixel_t;
+  signal raddr      : fb_addr_t := (others => '0');
+  signal rdata      : pixel_t;
 
   -- expectations / monitor results
   signal exp_color   : std_logic_vector(7 downto 0) := (others => '0');
@@ -30,12 +31,13 @@ begin
   clk <= not clk after T/2 when not finished else '0';
 
   eng : entity work.clear_engine
-    port map (clk => clk, rst_n => rst_n, start => start, color => color_in,
-              busy => busy, done => done, we => we, waddr => waddr, wdata => wdata);
+    port map (clk_i => clk, rst_n_i => rst_n, start_i => start, color_i => color_in,
+              busy_o => busy, done_o => done, fb_we_o => we, fb_waddr_o => waddr,
+              fb_wdata_o => wdata);
 
   fb : entity work.framebuffer
-    port map (clk => clk, we => we, waddr => waddr, wdata => wdata,
-              raddr => raddr, rdata => rdata);
+    port map (clk_i => clk, wr_en_i => we, wr_addr_i => waddr, wr_data_i => wdata,
+              rd_addr_i => raddr, rd_data_o => rdata);
 
   -- Monitor: samples every clock edge and checks the write stream.
   monitor : process (clk)
@@ -46,7 +48,7 @@ begin
       if we = '1' then
         assert busy = '1' report "we high while busy low" severity failure;
         assert n < NPIX report "more than 76800 writes in one clear" severity failure;
-        assert waddr = to_unsigned(n, 17)
+        assert waddr = to_unsigned(n, FB_ADDR_W)
           report "bad address: expected " & integer'image(n) &
                  ", got " & integer'image(to_integer(waddr)) severity failure;
         assert wdata = exp_color
@@ -88,7 +90,7 @@ begin
     begin
       for i in 0 to NPIX loop
         if i < NPIX then
-          raddr <= to_unsigned(i, 17);
+          raddr <= to_unsigned(i, FB_ADDR_W);
         end if;
         wait until rising_edge(clk); wait for 1 ns;
         if i > 0 then
