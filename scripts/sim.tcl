@@ -1,22 +1,30 @@
 # Run one VHDL tb in Vivado xsim with no GUI
 # To use:
 #   vivado -mode batch -nojournal -nolog -notrace -source scripts/sim.tcl \
-#       -tclargs <tb> <src_1.vhd> [<src_2.vhd> ...]
+#       -tclargs <tb> [-gNAME=VALUE ...] <src_1.vhd> [<src_2.vhd> ...]
 # Sources are compiled in order given
+# -gNAME=VALUE sets a top-level generic (passed to xelab -generic_top)
+# Files in tb/vectors/ are copied into the run directory, so a testbench
+# opens them by bare file name
 #
 # Pass/fail rule: testbench must print "<tb>: ALL TESTS PASSED"
 # Anything else exits with code 1
 # Outputs go to build/sim/<tb>/
 
 if {[llength $argv] < 2} {
-    puts "usage: -tclargs <tb> <src.vhd ..."
+    puts "usage: -tclargs <tb> \[-gNAME=VALUE ...\] <src.vhd> ..."
     exit 2
 }
 set top [lindex $argv 0]
 set repo [file normalize [file join [file dirname [info script]] ..]]
 set srcs {}
+set generics {}
 foreach f [lrange $argv 1 end] {
-    lappend srcs [file normalize [file join $repo $f]]
+    if {[regexp {^-g([A-Za-z][A-Za-z0-9_]*=.*)$} $f -> g]} {
+        lappend generics -generic_top $g
+    } else {
+        lappend srcs [file normalize [file join $repo $f]]
+    }
 }
 set run_dir [file join $repo build sim $top]
 file delete -force $run_dir
@@ -26,6 +34,9 @@ file mkdir [file join $run_dir data]
 file copy -force \
     [file join $repo rtl data cube_init.txt] \
     [file join $run_dir data cube_init.txt]
+foreach v [glob -nocomplain -directory [file join $repo tb vectors] *.txt *.csv] {
+    file copy -force $v $run_dir
+}
 cd $run_dir
 
 set ext [expr {$::tcl_platform(platform) eq "windows" ? ".bat" : ""}]
@@ -40,7 +51,7 @@ proc step {name args} {
 }
 
 step xvhdl xvhdl$ext --2008 {*}$srcs
-step xelab xelab$ext -debug off -s ${top}_sim work.$top
+step xelab xelab$ext -debug off {*}$generics -s ${top}_sim work.$top
 # xsim might exit 0 even after a failed assert, so check logs
 catch {exec -ignorestderr xsim$ext ${top}_sim -runall -log xsim.log} out
 

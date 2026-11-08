@@ -1,4 +1,4 @@
--- Shared ocnstants and helpers for QOGPU pipeline
+-- Shared constants and helpers for QOGPU pipeline
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
