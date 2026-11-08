@@ -2,23 +2,28 @@
 -- Last edited: 10/27/2026
 -- this is the test bench for the vga_timing module
 -- it will count 800 clocks per line, 525 lines per frame, and checks sync pulse widths (96 and 2)
+-- PIX_DIV = 1 runs a 25 MHz clock with the pixel enable tied high. PIX_DIV = 4
+-- runs a 100 MHz clock with a one-in-four pixel enable, as on the board; the
+-- checker then samples once per pixel and every count is the same.
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity vga_timing_tb is
+  generic (PIX_DIV : positive := 1);
 end entity vga_timing_tb;
 
 architecture sim of vga_timing_tb is
 
-  constant CLK_PERIOD : time    := 40 ns; -- 25 MHz
+  constant CLK_PERIOD : time    := 40 ns / PIX_DIV; -- 25 MHz pixel rate
   constant FRAMES     : natural := 3;     
 
   signal clk_i : std_logic := '0';
   signal rst_n_i : std_logic := '0';
   signal x_o, y_o : unsigned(9 downto 0);
   signal active_o, hsync_n_o, vsync_n_o : std_logic;
+  signal pix_en : std_logic := '1';
   signal done : boolean := false;
 
 begin
@@ -28,8 +33,20 @@ begin
 
   dut : entity work.vga_timing
     port map (
-      clk_i => clk_i, rst_n_i => rst_n_i, x_o => x_o, y_o => y_o,
+      clk_i => clk_i, rst_n_i => rst_n_i, pix_en_i => pix_en, x_o => x_o, y_o => y_o,
       active_o => active_o, hsync_n_o => hsync_n_o, vsync_n_o => vsync_n_o);
+
+  -- pixel enable: high one clock in every PIX_DIV
+  pix_div_gen : if PIX_DIV > 1 generate
+    process (clk_i)
+      variable n : natural range 0 to PIX_DIV - 1 := 0;
+    begin
+      if rising_edge(clk_i) then
+        if n = PIX_DIV - 1 then n := 0; else n := n + 1; end if;
+        if n = PIX_DIV - 1 then pix_en <= '1'; else pix_en <= '0'; end if;
+      end if;
+    end process;
+  end generate;
 
   -- reset
   process
@@ -57,7 +74,7 @@ begin
     variable started    : boolean := false;
   begin
     wait until rst_n_i = '1';
-    wait until rising_edge(clk_i);
+    wait until rising_edge(clk_i) and pix_en = '1';
 
     -- first clock out of reset, top-left of the frame
     assert x_o = 0 and y_o = 0
@@ -147,14 +164,14 @@ begin
       prev_h := hsync_n_o;
       prev_v := vsync_n_o;
       prev_x := to_integer(x_o);
-      prev_y := to_integer(y);
+      prev_y := to_integer(y_o);
       since_hfall := since_hfall + 1;
       since_vfall := since_vfall + 1;
 
-      wait until rising_edge(clk_i);
+      wait until rising_edge(clk_i) and pix_en = '1';
     end loop;
 
-    report "vga_timing_tb PASSED YAYY" severity note;
+    report "vga_timing_tb: ALL TESTS PASSED" severity note;
     done <= true;
     wait;
   end process checker;
