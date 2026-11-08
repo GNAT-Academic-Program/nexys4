@@ -45,20 +45,20 @@ The sync pulses begin right after the front porch: 640 + 16 = 656 horizontally a
 
 ## Implementation
 
-Two counters: `x` increments every clock and wraps at 799; `y` increments when `x` wraps and wraps at 524. This is equivalent to a nested loop with `x` as the inner counter. The three outputs are combinational comparisons on the counters, so no other state is needed.
+Two counters: `x` increments on every clock where the pixel enable `pix_en_i` is high (every clock at 25 MHz, every fourth clock at the board's 100 MHz) and wraps at 799; `y` increments when `x` wraps and wraps at 524. This is equivalent to a nested loop with `x` as the inner counter. The three outputs are combinational comparisons on the counters, so no other state is needed.
 
 ## Figures
 
 **VGA diagram.** 
 
-![vga_timing block](../images/vga_timing_block.png)
+![vga_timing block](../architecture/images/vga_timing_block.png)
 
 <!-- **Compiled design.** 
 
 ![vga_timing compiled](../images/vga_timing_compiled.png) comment -->
 
 ## Verification
-- `tb/vga_timing_tb.vhd` (VHDL-2008) runs 3 frames and asserts 800 clocks per line, 525 lines per frame, hsync low for 96 clocks, vsync low for 2 lines, and 307,200 active clocks per frame. 
+- `tb/vga_timing_tb.vhd` (VHDL-2008) runs 3 frames and asserts 800 pixels per line, 525 lines per frame, hsync low for 96 pixels, vsync low for 2 lines, and 307,200 active pixels per frame. `make sim-vga-timing` runs it at 25 MHz, and `make sim-vga-timing-100` runs it at 100 MHz with the pixel enable high one clock in four, as on the board.
 
 ## Reference
 
