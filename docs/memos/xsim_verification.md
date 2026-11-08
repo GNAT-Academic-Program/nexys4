@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | Pass run recorded; failure run and clean-clone check pending (see below) |
+| Status | Pass run must be re-recorded: the testbench changed on 11/8 (280 cycles with a rollover check). Failure run and clean-clone check pending (see below) |
 | Date | 2026-10-26 |
 | OS | Windows 11 Enterprise 10.0.26100 |
 | Vivado / xsim | 2024.2 (SW Build 5239630) |
@@ -10,6 +10,11 @@
 | Code commit | PASS: fill in after the current `rtl/counter.vhd` and `tb/counter_tb.vhd` changes are committed |
 
 ## Pass run
+
+The run below used the earlier 20-cycle testbench, which never reached
+rollover. On 11/8 the testbench was extended to the 280 cycles listed under
+Coverage and now fails unless the count wraps 255 -> 0. It passed under GHDL
+4.1 on Linux; rerun `make sim-counter` under Vivado and replace this section.
 
 Command: `make sim-counter`
 

@@ -23,14 +23,16 @@ begin
 
     stimulus : process -- stimulus will set the input values going into the counter and check results
         variable expected : natural range 0 to 255 := 0;
+        variable wrapped  : boolean := false;
     begin
         -- Check reset before any clock edge: its asynchronous, doesnt wait for clock edge.
         wait for 1 ns;
         assert q = to_unsigned(0, 8) --basically == checks if q == unsigned(0,8)
             report "FAIL: initial reset" severity failure;
 
-        --  20 clock cycles, each lasting 10 ns.
-        for cycle in 1 to 20 loop
+        --  N_CYCLES clock cycles of 10 ns. After the reset at cycle 15 the
+        --  counter is enabled for 265 cycles, so it wraps 255 -> 0 once.
+        for cycle in 1 to N_CYCLES loop
             -- set the input values going into the counter while the clock is low.
             if cycle <= 2 or cycle = 15 then
                 rst_n <= '0'; -- Reset at startup and again after counting.
@@ -60,6 +62,9 @@ begin
             end if;
 
             -- Let the clocked register and q update before checking them.
+            if rst_n = '1' and en = '1' and expected = 0 then
+                wrapped := true; -- count went 255 -> 0 without a reset
+            end if;
             wait for 1 ns;
             assert q = to_unsigned(expected, 8)
                 report "FAIL: cycle " & integer'image(cycle) &
@@ -68,6 +73,7 @@ begin
                 severity failure;
         end loop;
 
+        assert wrapped report "FAIL: counter never wrapped 255 -> 0" severity failure;
         report "counter_tb: ALL TESTS PASSED";
         done <= true;
         finish(0);
