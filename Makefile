@@ -1,44 +1,99 @@
-# Wrapper around Vivado batch TCL  scripts
-# Need Vivado on $PATH
+# Wrapper around Vivado batch TCL scripts and the host Ada tools
+# Needs Vivado on $PATH for sim-* and synth-*, GNAT + gprbuild for vectors/tools
+#
+#   make sim       every testbench (make -k sim keeps going after a failure)
+#   make vectors   regenerate the golden vectors in tb/vectors/ from the Ada reference
+#   make tools     build the host tools (fb2ppm) into build/ada/
 
 VIVADO ?= vivado
 VBATCH = $(VIVADO) -mode batch -nojournal -nolog -notrace
+SIM    = $(VBATCH) -source scripts/sim.tcl -tclargs
+SYNTH  = $(VBATCH) -source scripts/synth_ooc.tcl -tclargs
+PART   = xc7a100tcsg324-1
 
-FB_SRCS = rtl/qogpu_pkg.vhd rtl/framebuffer.vhd
+FB_SRCS   = rtl/qogpu_pkg.vhd rtl/framebuffer.vhd
 BRAM_SRCS = rtl/qogpu_pkg.vhd rtl/mem_if_pkg.vhd rtl/mem_ctrl_bram.vhd
+VGA_SRCS  = rtl/qogpu_pkg.vhd rtl/vga_timing.vhd rtl/vga_scanout.vhd
 
-.PHONY: sim sim-framebuffer sim-counter sim-bram sim-bram-w16 synth-framebuffer synth-framebuffer-35t synth-bram build clean
+# every testbench; add each new sim-* target here
+SIM_TARGETS = sim-framebuffer sim-clear-engine sim-counter sim-bram sim-bram-w16 \
+              sim-vga-timing sim-vga-timing-100 sim-vga-scanout sim-vga-scanout-100 \
+              sim-fx-mul sim-fx-mul-trunc sim-fx-pkg sim-frame-dump
 
-# all tb, add each new sim-* targ here
-sim: sim-framebuffer sim-counter sim-bram sim-bram-w16
+.PHONY: sim $(SIM_TARGETS) synth-framebuffer synth-bram synth-fx-mul \
+        vectors tools build clean
+
+sim: $(SIM_TARGETS)
 
 sim-framebuffer:
-	$(VBATCH) -source scripts/sim.tcl -tclargs framebuffer_tb $(FB_SRCS) tb/framebuffer_tb.vhd
+	$(SIM) framebuffer_tb $(FB_SRCS) tb/framebuffer_tb.vhd
+
+sim-clear-engine:
+	$(SIM) clear_engine_tb $(FB_SRCS) rtl/clear_engine.vhd tb/clear_engine_tb.vhd
 
 sim-counter:
-	$(VBATCH) -source scripts/sim.tcl -tclargs counter_tb rtl/counter.vhd tb/counter_tb.vhd
+	$(SIM) counter_tb rtl/counter.vhd tb/counter_tb.vhd
 
 sim-bram:
-	$(VBATCH) -source scripts/sim.tcl -tclargs mem_ctrl_bram_tb $(BRAM_SRCS) tb/mem_ctrl_bram_tb.vhd
+	$(SIM) mem_ctrl_bram_tb $(BRAM_SRCS) tb/mem_ctrl_bram_tb.vhd
 
 sim-bram-w16:
-	$(VBATCH) -source scripts/sim.tcl -tclargs mem_ctrl_bram_w16_tb $(BRAM_SRCS) tb/mem_ctrl_bram_tb.vhd tb/mem_ctrl_bram_w16_tb.vhd
+	$(SIM) mem_ctrl_bram_w16_tb $(BRAM_SRCS) tb/mem_ctrl_bram_tb.vhd tb/mem_ctrl_bram_w16_tb.vhd
 
-# NEXYS A7-100T (MVP demo)
+# 25 MHz clock, pixel enable tied high
+sim-vga-timing:
+	$(SIM) vga_timing_tb rtl/vga_timing.vhd tb/vga_timing_tb.vhd
+
+# 100 MHz clock, pixel enable one clock in four (as on the board)
+sim-vga-timing-100:
+	$(SIM) vga_timing_tb -gPIX_DIV=4 rtl/vga_timing.vhd tb/vga_timing_tb.vhd
+
+sim-vga-scanout:
+	$(SIM) vga_scanout_tb $(VGA_SRCS) tb/vga_scanout_tb.vhd
+
+sim-vga-scanout-100:
+	$(SIM) vga_scanout_tb -gPIX_DIV=4 $(VGA_SRCS) tb/vga_scanout_tb.vhd
+
+# rounding per numeric contract rule 5 (vectors_round.txt)
+sim-fx-mul:
+	$(SIM) fx_mul_tb rtl/fx_mul.vhd tb/fx_mul_tb.vhd
+
+# truncating variant (vectors_trunc.txt), kept for comparison
+sim-fx-mul-trunc:
+	$(SIM) fx_mul_tb -gROUND=0 rtl/fx_mul.vhd tb/fx_mul_tb.vhd
+
+# VHDL contract helpers against the Ada golden vectors (mul.csv, viewport.csv)
+sim-fx-pkg:
+	$(SIM) qogpu_fx_pkg_tb rtl/qogpu_fx_pkg.vhd tb/qogpu_fx_pkg_tb.vhd
+
+sim-frame-dump:
+	$(SIM) frame_dump_tb $(FB_SRCS) tb/frame_dump_pkg.vhd tb/frame_dump_tb.vhd
+
+# Nexys A7-100T, the delivery board (replan v5)
 synth-framebuffer:
-	$(VBATCH) -source scripts/synth_ooc.tcl -tclargs framebuffer xc7a100tcsg324-1 clk_i 10.0 $(FB_SRCS)
-
-# Mercury 2 - part string needs confirming
-synth-framebuffer-35t:
-	$(VBATCH) -source scripts/synth_ooc.tcl -tclargs framebuffer xc7a35tftg256-1 clk_i 10.0 $(FB_SRCS)
+	$(SYNTH) framebuffer $(PART) clk_i 10.0 $(FB_SRCS)
 
 synth-bram:
-	$(VBATCH) -source scripts/synth_ooc.tcl -tclargs mem_ctrl_bram_synth_top xc7a100tcsg324-1 clk_i 10.0 $(BRAM_SRCS) rtl/mem_ctrl_bram_synth_top.vhd
+	$(SYNTH) mem_ctrl_bram_synth_top $(PART) clk_i 10.0 $(BRAM_SRCS) rtl/mem_ctrl_bram_synth_top.vhd
 
-build:
+# check utilization.rpt for DSP48E1 > 0
+synth-fx-mul:
+	$(SYNTH) fx_mul $(PART) clk 10.0 rtl/fx_mul.vhd
+
+# Golden vectors from the Ada reference (numeric contract, RQ-38).
+# Writes mul, viewport, setup and depth_test (committed) and edge and
+# interp (git-ignored, several MB), then the fx_mul vectors from fx_ref.
+vectors:
+	gprbuild -q -P sw/ada/ref/qogpu_ref.gpr
+	build/ada/gen_vectors tb/vectors
+	mkdir -p build/ada/fx_ref
+	cd build/ada/fx_ref && gnatmake -q -gnat2022 -gnata ../../../model/fx_ref.adb
+	cd tb/vectors && ../../build/ada/fx_ref/fx_ref 0 && ../../build/ada/fx_ref/fx_ref 1
+
+tools:
+	gprbuild -q -P sw/ada/tools/fb2ppm.gpr
+
+build: tools
 
 clean:
 	rm -rf build .Xil
-.PHONY: sim-frame-dump
-sim-frame-dump:
-	$(VBATCH) -source scripts/sim.tcl -tclargs frame_dump_tb $(FB_SRCS) tb/frame_dump_pkg.vhd tb/frame_dump_tb.vhd
