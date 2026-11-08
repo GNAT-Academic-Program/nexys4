@@ -8,7 +8,7 @@
 
 ## Memory Interface
 
-This document defines the one interface between the depth buffer clients (clear engine, E4, E6) and the memory controller. Clients are written once against these rules and work with any back-end. `MEM_BACKEND = BRAM | DDR2` is set in the board config package (RQ-113), and SRAM follows in winter (RQ-114). The port types are in `rtl/mem_if_pkg.vhd`.
+This document defines the one interface between the depth buffer clients (clear engine, E4, E6) and the memory controller. Clients are written once against these rules and work with any back-end. `MEM_BACKEND = BRAM | DDR2` is set in the board config package (RQ-113). DDR2 is the default on the Nexys A7-100T, and BRAM is the fallback (replan v5). The port types are in `rtl/mem_if_pkg.vhd`.
 
 The framebuffer is not behind this interface. It stays in BRAM with its own write port.
 

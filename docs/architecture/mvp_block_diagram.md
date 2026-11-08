@@ -10,7 +10,7 @@ RQ-79 · Sprint 1 · Owner: Vance Steele
 - Screen space is 320x240 after Block C
 - RGB332 framebuffer in BRAM (320x240x8), 2x scaled to 640x480 by VGA
 - Depth buffer behind the memory controller, `DEPTH_W` = 8 by default
-- valid/ready between blocks, one clock domain (`clk_i`, `rstn_i` active low)
+- valid/ready between blocks, one clock domain (`clk_i`, `rst_n_i` active low)
 
 **Handshake:** a transfer happens on the rising edge where `valid` and `ready` are both high. A source must not wait for `ready` before raising `valid`, and must hold its payload steady until the transfer happens.
 
@@ -34,7 +34,7 @@ RQ-79 · Sprint 1 · Owner: Vance Steele
 
 ## Ports by block
 
-All blocks also have `clk_i` and `rstn_i`. Widths marked *(unc)* are unconfirmed until the numeric contract (RQ-38) is done.
+All blocks also have `clk_i` and `rst_n_i`. Edge and area widths follow numeric contract rule 9 (`docs/spec/qogpu_numeric_contract.md`).
 
 ### Block A: command/status + shared buffer
 
@@ -114,9 +114,11 @@ Scale/offset to 320x240 and depth range mapping (z −1..1 to 0..2^`DEPTH_W`−1
 | `out_valid_o` / `out_ready_i` | out / in | 1 | Handshake to E1 |
 | `out_xmin_o`, `out_xmax_o` | out | 9 | Bounding box x, clamped to screen |
 | `out_ymin_o`, `out_ymax_o` | out | 8 | Bounding box y, clamped to screen |
-| `out_e{0,1,2}_a_o`, `out_e{0,1,2}_b_o` | out | 11 each *(unc)* | Edge function x/y coefficients |
-| `out_e{0,1,2}_c_o` | out | 24 each *(unc)* | Edge function constants |
-| `out_area_o` | out | 24 *(unc)* | Signed area |
+| `out_e{0,1,2}_a_o` | out | 25 each | Edge x coefficient A_i = y_i − y_{i+1}, signed Q16 difference |
+| `out_e{0,1,2}_b_o` | out | 26 each | Edge y coefficient B_i = x_{i+1} − x_i, signed Q16 difference |
+| `out_v{0,1,2}_{x,y}_o` | out | 32 each | Vertex positions, the reference point of each edge function |
+| `out_area_o` | out | 51 | Twice the triangle area (area2), ≥ 0 after winding normalization (rule 12) |
+| `out_tl_o` | out | 3 | Top-left flag per edge (rule 11) |
 | `out_z{0,1,2}_o` | out | `DEPTH_W` each | Vertex depths |
 | `out_color_o`, `out_last_o` | out | 8, 1 | Pass-through |
 | `out_empty_o` | out | 1 | Zero-area triangle; only sent when it is the last one, so the frame still finishes |
@@ -144,7 +146,7 @@ Scale/offset to 320x240 and depth range mapping (z −1..1 to 0..2^`DEPTH_W`−1
 | `in_tri_i` | in | — | Edge coefficients |
 | `out_valid_o` / `out_ready_i` | out / in | 1 | Handshake to E3 |
 | `out_px_o`, `out_py_o` | out | 9, 8 | Pixel |
-| `out_w{0,1,2}_o` | out | 24 each *(unc)* | Edge function values |
+| `out_w{0,1,2}_o` | out | 51 each | Edge function values E_i, signed 18.32 raw |
 | `out_kill_o` | out | 1 | Pixel outside triangle |
 | `out_eot_o`, `out_eof_o` | out | 1, 1 | Markers |
 
@@ -202,11 +204,10 @@ Clients: clear engine (write), E4 (read), E6 (write), latency and ordering rules
 | `mem_req_we_o` | out | 1 | 1 = write, 0 = read |
 | `mem_req_addr_o` | out | 17 | Depth word address (y*320 + x) |
 | `mem_req_wdata_o` | out | `DEPTH_W` | Write data |
-| `mem_rsp_valid_i` | in | 1 | Read data valid |
-| `mem_rsp_ready_o` | out | 1 | Client accepts read data |
+| `mem_rsp_valid_i` | in | 1 | Read data valid, one-cycle pulse; there is no response back-pressure (memory interface rule 9) |
 | `mem_rsp_rdata_i` | in | `DEPTH_W` | Read data |
 
-The controller's backend side (BRAM or SRAM pins) is chosen by `MEM_BACKEND` and is not seen by the pipeline
+The controller's back-end (BRAM, or DDR2 through the MIG core) is chosen by `MEM_BACKEND` and is not seen by the pipeline
 
 ### Framebuffer
 
@@ -235,10 +236,11 @@ The controller's backend side (BRAM or SRAM pins) is chosen by `MEM_BACKEND` and
 |---|---|---|---|
 | `fb_raddr_o` | out | 17 | Framebuffer address, 2x2 doubled |
 | `fb_rdata_i` | in | 8 | RGB332 |
-| `vga_hs_o` | out | 1 | Horizontal sync |
-| `vga_vs_o` | out | 1 | Vertical sync |
+| `pix_en_i` | in | 1 | Pixel-rate enable (one clock in four at 100 MHz) |
+| `vga_hs_n_o` | out | 1 | Horizontal sync, active low |
+| `vga_vs_n_o` | out | 1 | Vertical sync, active low |
 | `vga_r_o` | out | 3 | Red |
 | `vga_g_o` | out | 3 | Green |
 | `vga_b_o` | out | 2 | Blue |
 
-640x480@60 timing from a pixel enable on the system clock (one clock domain).
+640x480@60 timing from a pixel enable on the system clock (one clock domain). RGB and syncs leave from registers. The top level maps RGB332 onto the board's 4-4-4 VGA pins.
