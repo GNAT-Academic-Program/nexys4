@@ -3,6 +3,7 @@
 --   "AAAAAAAA BBBBBBBB YYYYYYYY" hex per line (20 directed + 1000 random).
 -- ROUND selects the file: 1 -> vectors_round.txt, 0 -> vectors_trunc.txt
 -- (scripts/sim.tcl copies tb/vectors/ into the run directory).
+-- tb/fx_mul_trunc_tb.vhd runs this testbench with ROUND = 0.
 -- Drives back-to-back with periodic bubbles (valid low) to exercise the
 -- valid pipe. Checks y in order, and checks every cycle that out_valid
 -- equals in_valid delayed by exactly LATENCY clock edges.
@@ -15,7 +16,8 @@ use std.env.all;
 entity fx_mul_tb is
   generic (
     ROUND     : natural range 0 to 1 := 1;
-    N_EXPECT  : natural := 1020
+    N_EXPECT  : natural := 1020;
+    TB_NAME   : string  := "fx_mul_tb"   -- name in the pass line (scripts/sim.tcl)
   );
 end entity;
 
@@ -125,8 +127,8 @@ begin
     wait until done;
     wait for 1 ns;
     if errors = 0 and lat_errs = 0 and checked = N_EXPECT then
-      report "fx_mul_tb: " & integer'image(checked) & " vectors, ROUND=" & integer'image(ROUND);
-      report "fx_mul_tb: ALL TESTS PASSED";
+      report TB_NAME & ": " & integer'image(checked) & " vectors, ROUND=" & integer'image(ROUND);
+      report TB_NAME & ": ALL TESTS PASSED";
     else
       report "FAIL: errors=" & integer'image(errors) & " latency errors=" &
              integer'image(lat_errs) & " checked=" &

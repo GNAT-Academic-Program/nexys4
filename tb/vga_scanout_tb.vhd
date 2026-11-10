@@ -2,14 +2,18 @@
 --Last Updated: 11/8/2026
 --Reads a framebuffer preloaded with a gradient and checks that 4 neighboring screen
 --pixels show the same color and that blanking is black; syncs are aligned with the delayed data.
---PIX_DIV = 4 runs a 100 MHz clock with a one-in-four pixel enable, as on the board.
+--PIX_DIV = 4 runs a 100 MHz clock with a one-in-four pixel enable, as on the board
+--(tb/vga_scanout_100_tb.vhd).
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity vga_scanout_tb is
-  generic (PIX_DIV : positive := 1);
+  generic (
+    PIX_DIV : positive := 1;
+    TB_NAME : string   := "vga_scanout_tb"   -- name in the pass line (scripts/sim.tcl)
+  );
 end entity;
 
 architecture sim of vga_scanout_tb is
@@ -175,7 +179,7 @@ begin
     end loop;
 
     if errors = 0 then
-      report "vga_scanout_tb: ALL TESTS PASSED";
+      report TB_NAME & ": ALL TESTS PASSED";
     else
       report "FAIL: " & integer'image(errors) & " errors" severity error;
     end if;

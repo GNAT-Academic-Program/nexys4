@@ -5,13 +5,17 @@
 -- PIX_DIV = 1 runs a 25 MHz clock with the pixel enable tied high. PIX_DIV = 4
 -- runs a 100 MHz clock with a one-in-four pixel enable, as on the board; the
 -- checker then samples once per pixel and every count is the same.
+-- tb/vga_timing_100_tb.vhd runs this testbench with PIX_DIV = 4.
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity vga_timing_tb is
-  generic (PIX_DIV : positive := 1);
+  generic (
+    PIX_DIV : positive := 1;
+    TB_NAME : string   := "vga_timing_tb"   -- name in the pass line (scripts/sim.tcl)
+  );
 end entity vga_timing_tb;
 
 architecture sim of vga_timing_tb is
@@ -171,7 +175,7 @@ begin
       wait until rising_edge(clk_i) and pix_en = '1';
     end loop;
 
-    report "vga_timing_tb: ALL TESTS PASSED" severity note;
+    report TB_NAME & ": ALL TESTS PASSED" severity note;
     done <= true;
     wait;
   end process checker;

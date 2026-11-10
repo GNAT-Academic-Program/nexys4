@@ -1,9 +1,11 @@
 # Run one VHDL tb in Vivado xsim with no GUI
 # To use:
 #   vivado -mode batch -nojournal -nolog -notrace -source scripts/sim.tcl \
-#       -tclargs <tb> [-gNAME=VALUE ...] <src_1.vhd> [<src_2.vhd> ...]
+#       -tclargs <tb> <src_1.vhd> [<src_2.vhd> ...]
 # Sources are compiled in order given
-# -gNAME=VALUE sets a top-level generic (passed to xelab -generic_top)
+# Generics are not passed on the command line: on Windows the Vivado .bat
+# launchers split arguments at '=', so a testbench that needs another
+# generic value gets a small wrapper entity (see tb/mem_ctrl_bram_w16_tb.vhd)
 # Files in tb/vectors/ are copied into the run directory, so a testbench
 # opens them by bare file name
 #
@@ -12,19 +14,14 @@
 # Outputs go to build/sim/<tb>/
 
 if {[llength $argv] < 2} {
-    puts "usage: -tclargs <tb> \[-gNAME=VALUE ...\] <src.vhd> ..."
+    puts "usage: -tclargs <tb> <src.vhd ..."
     exit 2
 }
 set top [lindex $argv 0]
 set repo [file normalize [file join [file dirname [info script]] ..]]
 set srcs {}
-set generics {}
 foreach f [lrange $argv 1 end] {
-    if {[regexp {^-g([A-Za-z][A-Za-z0-9_]*=.*)$} $f -> g]} {
-        lappend generics -generic_top $g
-    } else {
-        lappend srcs [file normalize [file join $repo $f]]
-    }
+    lappend srcs [file normalize [file join $repo $f]]
 }
 set run_dir [file join $repo build sim $top]
 file delete -force $run_dir
@@ -51,7 +48,7 @@ proc step {name args} {
 }
 
 step xvhdl xvhdl$ext --2008 {*}$srcs
-step xelab xelab$ext -debug off {*}$generics -s ${top}_sim work.$top
+step xelab xelab$ext -debug off -s ${top}_sim work.$top
 # xsim might exit 0 even after a failed assert, so check logs
 catch {exec -ignorestderr xsim$ext ${top}_sim -runall -log xsim.log} out
 

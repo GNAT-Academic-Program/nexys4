@@ -46,13 +46,13 @@ sim-vga-timing:
 
 # 100 MHz clock, pixel enable one clock in four (as on the board)
 sim-vga-timing-100:
-	$(SIM) vga_timing_tb -gPIX_DIV=4 rtl/vga_timing.vhd tb/vga_timing_tb.vhd
+	$(SIM) vga_timing_100_tb rtl/vga_timing.vhd tb/vga_timing_tb.vhd tb/vga_timing_100_tb.vhd
 
 sim-vga-scanout:
 	$(SIM) vga_scanout_tb $(VGA_SRCS) tb/vga_scanout_tb.vhd
 
 sim-vga-scanout-100:
-	$(SIM) vga_scanout_tb -gPIX_DIV=4 $(VGA_SRCS) tb/vga_scanout_tb.vhd
+	$(SIM) vga_scanout_100_tb $(VGA_SRCS) tb/vga_scanout_tb.vhd tb/vga_scanout_100_tb.vhd
 
 # rounding per numeric contract rule 5 (vectors_round.txt)
 sim-fx-mul:
@@ -60,7 +60,7 @@ sim-fx-mul:
 
 # truncating variant (vectors_trunc.txt), kept for comparison
 sim-fx-mul-trunc:
-	$(SIM) fx_mul_tb -gROUND=0 rtl/fx_mul.vhd tb/fx_mul_tb.vhd
+	$(SIM) fx_mul_trunc_tb rtl/fx_mul.vhd tb/fx_mul_tb.vhd tb/fx_mul_trunc_tb.vhd
 
 # VHDL contract helpers against the Ada golden vectors (mul.csv, viewport.csv)
 sim-fx-pkg:
