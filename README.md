@@ -1,3 +1,7 @@
+﻿# Nexys4 QOGPU
+Team: Rose-Hulman Team 5: Connor Bodie, Landon Cahoon, Alex Freel, Vance Steele, Helen Xu
+MVP Goal: Implement a GPU on the Nexys4 FPGA board.
+
 # nexys4
 
 Board support package for the Digilent Nexys 4 and Nexys 4 DDR running the
@@ -14,11 +18,11 @@ the Nexys 4 DDR: the GPIO numbers are the same, only the bitstream differs.
 
 ```
 Application (examples/blinky)
-    |
+   |
 Board crate (nexys4)     <- this crate
-    |
+   |
 MCU crate (neorv32)
-    |
+   |
 Generic interfaces (gpio_generic, usart_generic, debug_generic)
 ```
 

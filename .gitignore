@@ -2,3 +2,22 @@
 /lib/
 /alire/
 /config/
+
+# Vivado / xsim outputs
+/build/
+.Xil/
+xsim.dir/
+*.wdb
+vivado*.log
+webtalk*
+
+# xsim run directly from the repo root
+xvhdl.log
+xelab.log
+xsim.log
+xsim*.jou
+*.pb
+xsim*.backup.log
+# Golden vectors too large to commit; regenerate with "make vectors"
+tb/vectors/edge.csv
+tb/vectors/interp.csv
