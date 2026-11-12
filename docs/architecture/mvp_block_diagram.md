@@ -112,16 +112,22 @@ Scale/offset to 320x240 and depth range mapping (z −1..1 to 0..2^`DEPTH_W`−1
 | `in_v{0,1,2}_z_i` | in | `DEPTH_W` each | Depth |
 | `in_color_i`, `in_last_i` | in | 8, 1 | Pass-through |
 | `out_valid_o` / `out_ready_i` | out / in | 1 | Handshake to E1 |
-| `out_xmin_o`, `out_xmax_o` | out | 9 | Bounding box x, clamped to screen |
-| `out_ymin_o`, `out_ymax_o` | out | 8 | Bounding box y, clamped to screen |
-| `out_e{0,1,2}_a_o` | out | 25 each | Edge x coefficient A_i = y_i − y_{i+1}, signed Q16 difference |
-| `out_e{0,1,2}_b_o` | out | 26 each | Edge y coefficient B_i = x_{i+1} − x_i, signed Q16 difference |
-| `out_v{0,1,2}_{x,y}_o` | out | 32 each | Vertex positions, the reference point of each edge function |
-| `out_area_o` | out | 51 | Twice the triangle area (area2), ≥ 0 after winding normalization (rule 12) |
-| `out_tl_o` | out | 3 | Top-left flag per edge (rule 11) |
-| `out_z{0,1,2}_o` | out | `DEPTH_W` each | Vertex depths |
-| `out_color_o`, `out_last_o` | out | 8, 1 | Pass-through |
-| `out_empty_o` | out | 1 | Zero-area triangle; only sent when it is the last one, so the frame still finishes |
+| `out_tri_o` | out | `tri_t` | One record, see `rtl/raster_pkg.vhd`; fields below |
+
+Fields of `tri_t`:
+
+| Field | Width | Description |
+|---|---|---|
+| `xmin`, `xmax` | 9 | Bounding box x, clamped to screen |
+| `ymin`, `ymax` | 8 | Bounding box y, clamped to screen |
+| `a(0..2)` | 25 each | Edge x coefficient A_i = y_i − y_{i+1}, signed Q16 difference |
+| `b(0..2)` | 26 each | Edge y coefficient B_i = x_{i+1} − x_i, signed Q16 difference |
+| `vx(0..2)`, `vy(0..2)` | 32 each | Vertex positions, the reference point of each edge function |
+| `area2` | 51 | Twice the triangle area, ≥ 0 after winding normalization (rule 12) |
+| `tl` | 3 | Top-left flag per edge (rule 11) |
+| `z(0..2)` | 16 each | Vertex depths, low `DEPTH_W` bits used |
+| `color`, `last` | 8, 1 | Pass-through |
+| `empty` | 1 | Zero-area triangle; only sent when it is the last one, so the frame still finishes |
 
 ### E1: pixel scan
 

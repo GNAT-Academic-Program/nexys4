@@ -14,13 +14,14 @@ PART   = xc7a100tcsg324-1
 FB_SRCS   = rtl/qogpu_pkg.vhd rtl/framebuffer.vhd
 BRAM_SRCS = rtl/qogpu_pkg.vhd rtl/mem_if_pkg.vhd rtl/mem_ctrl_bram.vhd
 VGA_SRCS  = rtl/qogpu_pkg.vhd rtl/vga_timing.vhd rtl/vga_scanout.vhd
+SETUP_SRCS = rtl/qogpu_pkg.vhd rtl/qogpu_fx_pkg.vhd rtl/raster_pkg.vhd rtl/tri_setup.vhd
 
 # every testbench; add each new sim-* target here
 SIM_TARGETS = sim-framebuffer sim-clear-engine sim-counter sim-bram sim-bram-w16 \
               sim-vga-timing sim-vga-timing-100 sim-vga-scanout sim-vga-scanout-100 \
-              sim-fx-mul sim-fx-mul-trunc sim-fx-pkg sim-frame-dump
+              sim-fx-mul sim-fx-mul-trunc sim-fx-pkg sim-frame-dump sim-tri-setup
 
-.PHONY: sim $(SIM_TARGETS) synth-framebuffer synth-bram synth-fx-mul \
+.PHONY: sim $(SIM_TARGETS) synth-framebuffer synth-bram synth-fx-mul synth-tri-setup \
         vectors tools build clean
 
 sim: $(SIM_TARGETS)
@@ -69,6 +70,10 @@ sim-fx-pkg:
 sim-frame-dump:
 	$(SIM) frame_dump_tb $(FB_SRCS) tb/frame_dump_pkg.vhd tb/frame_dump_tb.vhd
 
+# Block D against setup.csv (208 rows) plus drop, back-pressure and reset checks
+sim-tri-setup:
+	$(SIM) tri_setup_tb $(SETUP_SRCS) tb/tri_setup_tb.vhd
+
 # Nexys A7-100T, the delivery board (replan v5)
 synth-framebuffer:
 	$(SYNTH) framebuffer $(PART) clk_i 10.0 $(FB_SRCS)
@@ -79,6 +84,10 @@ synth-bram:
 # check utilization.rpt for DSP48E1 > 0
 synth-fx-mul:
 	$(SYNTH) fx_mul $(PART) clk 10.0 rtl/fx_mul.vhd
+
+# check utilization.rpt for DSP48E1 = 4 (two 25x26 products)
+synth-tri-setup:
+	$(SYNTH) tri_setup $(PART) clk_i 10.0 $(SETUP_SRCS)
 
 # Golden vectors from the Ada reference (numeric contract, RQ-38).
 # Writes mul, viewport, setup and depth_test (committed) and edge and
